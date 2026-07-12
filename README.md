@@ -18,8 +18,3 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
-
-## Build
-```bash
-pyinstaller --noconsole --onefile --add-binary "ffmpeg.exe;." --name "MP3_320kbps_Downloader" main.py
-```
