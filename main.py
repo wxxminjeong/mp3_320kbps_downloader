@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import customtkinter as ctk
 from tkinter import filedialog
@@ -31,6 +32,14 @@ def progress_hook(d):
     elif d['status'] == 'finished':
         app.after(0, lambda: status_label.configure(text="Converting & Adding Cover...", text_color="#00FFCC"))
 
+# ★ Added: Function to find the hidden ffmpeg.exe path inside the packaged EXE
+def get_ffmpeg_path():
+    if hasattr(sys, '_MEIPASS'):
+        # If packaged with PyInstaller, find it in the temporary folder (_MEIPASS)
+        return os.path.join(sys._MEIPASS, 'ffmpeg.exe')
+    # If run as a normal python script, find it in the same directory
+    return 'ffmpeg.exe'
+
 def download_mp3():
     url = url_entry.get().strip()
     if not url:
@@ -43,6 +52,7 @@ def download_mp3():
     ydl_opts = {
         'format': 'bestaudio/best',
         'writethumbnail': True, # Download YouTube thumbnail
+        'ffmpeg_location': get_ffmpeg_path(), # ★ Added: Tell yt-dlp the exact location of ffmpeg
         'postprocessors': [
             {
                 'key': 'FFmpegExtractAudio',
@@ -73,7 +83,6 @@ def download_mp3():
     threading.Thread(target=run_download, daemon=True).start()
 
 # --- UI Layout ---
-
 title_label = ctk.CTkLabel(app, text="MP3_320kbps Downloader", font=ctk.CTkFont(size=24, weight="bold"))
 title_label.pack(pady=(25, 20))
 
