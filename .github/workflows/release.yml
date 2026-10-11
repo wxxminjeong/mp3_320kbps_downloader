@@ -1,0 +1,113 @@
+# Builds MP3_320kbps_Downloader.exe on Windows and publishes it as a GitHub Release.
+#
+# Runs when the app's code changes on main, by hand (Actions -> Release -> Run workflow),
+# and once a day to pick up new yt-dlp versions: YouTube changes often and old yt-dlp
+# versions stop working, so a fresh exe is released whenever yt-dlp has a new version.
+# Older releases are deleted afterwards, so Releases always holds just the newest exe.
+# The app checks Releases on start and offers to update itself (updater.py).
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ["*.py", "requirements.txt", "icon.ico", ".github/workflows/release.yml"]
+  schedule:
+    - cron: "37 21 * * *"  # every day at 06:37 Korean time
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade -r requirements.txt pyinstaller
+
+      - name: Decide whether there is anything new
+        id: plan
+        shell: python
+        run: |
+          import glob, hashlib, os, re, subprocess
+          import yt_dlp
+
+          def latest_release(field):
+              result = subprocess.run(["gh", "release", "view", "--json", field, "--jq", "." + field],
+                                      capture_output=True, text=True)
+              return result.stdout.strip() if result.returncode == 0 else ""
+
+          code = hashlib.sha256()
+          for path in sorted(glob.glob("*.py")) + ["requirements.txt", "icon.ico"]:
+              with open(path, "rb") as f:
+                  code.update(f.read())
+          ytdlp = yt_dlp.version.__version__
+          build = f"code {code.hexdigest()[:7]} / yt-dlp {ytdlp}"
+
+          last_tag = latest_release("tagName")
+          scheduled = os.environ["GITHUB_EVENT_NAME"] == "schedule"
+          release = not (scheduled and f"Build: {build}" in latest_release("body"))
+
+          with open("app.py", encoding="utf-8") as f:
+              base = re.search(r'APP_VERSION = "([^"]+)"', f.read()).group(1)
+          last = last_tag.lstrip("v.")
+          patch = int(last.rsplit(".", 1)[1]) + 1 if last.startswith(base + ".") else 0
+          version = f"{base}.{patch}"
+
+          print(f"Release {version} ({build})" if release else f"Nothing new since {last_tag} ({build})")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"release={str(release).lower()}\nversion={version}\nytdlp={ytdlp}\nbuild={build}\n")
+
+      - name: Build the exe
+        if: steps.plan.outputs.release == 'true'
+        run: python build.py --version "${{ steps.plan.outputs.version }}"
+
+      - name: Test the exe
+        if: steps.plan.outputs.release == 'true'
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $run = Start-Process -FilePath "dist\MP3_320kbps_Downloader.exe" `
+            -ArgumentList "--self-test", "$PWD\self-test.txt" -Wait -PassThru
+          Get-Content self-test.txt
+          if ($run.ExitCode -ne 0) { throw "Self-test failed (exit code $($run.ExitCode))" }
+
+      - name: Publish the release and delete the older ones
+        if: steps.plan.outputs.release == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          YTDLP: ${{ steps.plan.outputs.ytdlp }}
+          BUILD: ${{ steps.plan.outputs.build }}
+        run: |
+          cat > notes.md <<EOF
+          **Download \`MP3_320kbps_Downloader.exe\` below and run it.** FFmpeg and Deno are already inside.
+          Using version 2.0 or newer? The app offers this update by itself.
+
+          **아래 \`MP3_320kbps_Downloader.exe\`를 받아서 실행하세요.** FFmpeg와 Deno가 들어 있습니다.
+          2.0 이상을 쓰고 있다면 프로그램이 알아서 업데이트를 알려 줍니다.
+
+          - yt-dlp $YTDLP
+
+          Build: $BUILD
+          EOF
+          gh release create "v$VERSION" dist/MP3_320kbps_Downloader.exe --target "$GITHUB_SHA" \
+            --title "MP3 320kbps Downloader $VERSION" --notes-file notes.md --latest
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | while read -r tag; do
+            if [ "$tag" != "v$VERSION" ]; then
+              gh release delete "$tag" --cleanup-tag --yes
+            fi
+          done

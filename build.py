@@ -1,13 +1,16 @@
 """Build a single-file MP3_320kbps_Downloader.exe with PyInstaller.
 
     pip install -r requirements.txt pyinstaller
-    python build.py
+    python build.py [--version 2.0.3]
 
 FFmpeg and Deno are packed into the exe, so it runs on PCs without Python.
-The result is dist/MP3_320kbps_Downloader.exe.
+The version is what the exe compares against GitHub Releases when it looks
+for updates. The result is dist/MP3_320kbps_Downloader.exe.
 """
 
+import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +20,16 @@ NAME = "MP3_320kbps_Downloader"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+def app_version():
+    with open(os.path.join(HERE, "app.py"), encoding="utf-8") as f:
+        return re.search(r'APP_VERSION = "([^"]+)"', f.read()).group(1) + ".0"
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--version", default=app_version(), help="version number, e.g. 2.0.3")
+    version = parser.parse_args().version
+
     try:
         import deno
         import imageio_ffmpeg
@@ -27,9 +39,13 @@ def main():
 
     exe = ".exe" if os.name == "nt" else ""
     with tempfile.TemporaryDirectory() as staging:
+        version_file = os.path.join(staging, "version.txt")
+        with open(version_file, "w", encoding="utf-8") as f:
+            f.write(version)
         command = [
             sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",
             "--name", NAME, "--icon", os.path.join(HERE, "icon.ico"),
+            "--add-data", f"{version_file}{os.pathsep}.",
         ]
         for name, path in tools.items():
             copy = os.path.join(staging, name + exe)  # the app looks for these exact names
@@ -38,7 +54,7 @@ def main():
         command.append(os.path.join(HERE, "main.py"))
         subprocess.run(command, cwd=HERE, check=True)
 
-    print(f"\nDone: {os.path.join(HERE, 'dist', NAME + exe)}")
+    print(f"\nDone: {os.path.join(HERE, 'dist', NAME + exe)} (version {version})")
 
 
 if __name__ == "__main__":
