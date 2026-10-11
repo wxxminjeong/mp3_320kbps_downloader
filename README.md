@@ -74,13 +74,11 @@ Intel Macs are not supported.
 
 ### Updates
 
-You don't need to come back here for new versions.
+You don't need to keep an eye on this page: the app tells you when there is a new version.
 
 - Every day, GitHub Actions checks whether yt-dlp (the part that talks to YouTube) has a new version. If it does, new Windows and Mac versions are built, tested and published automatically, and the old release is removed.
-- The app checks for a new release a few seconds after it starts. If there is one, it asks **"Update now?"**. Click **Yes** and it downloads the new version, checks it, replaces itself and restarts.
+- The app checks for a new release a few seconds after it starts. If there is one, it asks whether to open the download page. Download the new version there and use it instead of the old one (on a Mac, replace the app in Applications).
 - Click **No** and it won't ask again until the next version. **Help → Check for Updates...** checks right away.
-- If the update can't replace the app (for example because it is in a folder you can't write to), it offers to open the download page instead.
-- On a Mac, keep the app in **Applications**: run straight from the Downloads folder, macOS doesn't let it replace itself.
 
 ### Running from source
 
@@ -113,10 +111,9 @@ You normally don't need to do this: the release workflow builds and publishes bo
 | `app.py` | The window: link box, progress, download list, menus, settings |
 | `downloader.py` | The download queue: runs yt-dlp on a background thread, crops the cover, finds FFmpeg and Deno |
 | `win98.py` | Windows 98 widgets drawn by hand: buttons, check boxes, group boxes, progress bar, message boxes, pixel-art icons |
-| `updater.py` | Checks GitHub Releases for a newer version, downloads it and swaps it in (the .exe, or the .app on a Mac) |
+| `updater.py` | Checks GitHub Releases for a newer version |
 | `build.py` | Builds the app with PyInstaller: one .exe on Windows, a zipped .app on a Mac |
 | `.github/workflows/release.yml` | Builds, tests and publishes the Windows and Mac versions; runs daily for new yt-dlp versions |
-| `.github/scripts/test_update.py` | Release check: an installed copy of the app updates itself to the new build |
 | `icon.ico` | Program icon |
 
 ### Troubleshooting
@@ -206,13 +203,11 @@ Intel 맥은 지원하지 않습니다.
 
 ### 업데이트
 
-새 버전을 받으러 여기 다시 올 필요가 없습니다.
+이 페이지를 계속 확인할 필요는 없습니다. 새 버전이 나오면 프로그램이 알려 줍니다.
 
 - GitHub Actions가 매일 yt-dlp(YouTube와 통신하는 부분)에 새 버전이 나왔는지 확인합니다. 나왔으면 Windows용과 맥용을 자동으로 빌드하고 테스트해서 올리고, 예전 릴리스는 지웁니다.
-- 앱은 켜지고 몇 초 뒤에 새 릴리스가 있는지 확인합니다. 있으면 **"Update now?"** 라고 묻고, **Yes**를 누르면 새 버전을 받아 검사한 뒤 자기 자신을 바꾸고 다시 시작합니다.
+- 앱은 켜지고 몇 초 뒤에 새 릴리스가 있는지 확인합니다. 있으면 다운로드 페이지를 열지 묻습니다. 거기서 새 버전을 받아 예전 것 대신 쓰면 됩니다 (맥은 응용 프로그램 폴더의 앱을 바꿔 주세요).
 - **No**를 누르면 다음 버전이 나올 때까지 다시 묻지 않습니다. **Help → Check for Updates...** 로 바로 확인할 수도 있습니다.
-- 앱을 바꿀 수 없으면 (예: 쓰기 권한이 없는 폴더에 있을 때) 대신 다운로드 페이지를 열어 줍니다.
-- 맥에서는 앱을 **응용 프로그램** 폴더에 두세요. 다운로드 폴더에서 바로 실행하면 macOS가 앱이 자기 자신을 바꾸지 못하게 합니다.
 
 ### 소스로 실행하기
 
@@ -245,10 +240,9 @@ Windows에서는 `dist/MP3_320kbps_Downloader.exe`, 맥에서는 `dist/MP3_320kb
 | `app.py` | 창: 링크 입력, 진행 상황, 다운로드 목록, 메뉴, 설정 저장 |
 | `downloader.py` | 다운로드 대기열: 백그라운드 스레드에서 yt-dlp 실행, 커버 자르기, FFmpeg와 Deno 찾기 |
 | `win98.py` | 직접 그린 Windows 98 위젯: 버튼, 체크박스, 그룹 상자, 진행 막대, 메시지 창, 픽셀 아트 아이콘 |
-| `updater.py` | GitHub Releases에서 새 버전을 확인하고, 받아서 교체 (.exe, 맥은 .app) |
+| `updater.py` | GitHub Releases에서 새 버전이 나왔는지 확인 |
 | `build.py` | PyInstaller로 빌드: Windows는 exe 하나, 맥은 .app을 압축한 zip |
 | `.github/workflows/release.yml` | Windows용과 맥용을 빌드·테스트·게시. yt-dlp 새 버전을 확인하려고 매일 실행 |
-| `.github/scripts/test_update.py` | 릴리스 전 검사: 설치된 앱이 새 빌드로 스스로 업데이트되는지 확인 |
 | `icon.ico` | 프로그램 아이콘 |
 
 ### 문제 해결
