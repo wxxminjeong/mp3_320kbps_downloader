@@ -7,7 +7,8 @@
 ## English
 
 Paste a YouTube link and get a **320 kbps MP3** with the cover art and tags already filled in.
-The window looks like a Windows 98 program. Built with Python (Tkinter), yt-dlp and FFmpeg.
+The window looks like a Windows 98 program. Runs on Windows 10 / 11 and on Macs with Apple Silicon.
+Built with Python (Tkinter), yt-dlp and FFmpeg.
 
 ### How it works
 
@@ -46,29 +47,45 @@ Tips:
 - You can paste several links at once, separated by spaces or new lines.
 - You can keep adding links while something is downloading.
 - Right-click a song in the list to retry it, copy its link or remove it. Double-click a failed one to see what went wrong.
-- Every underlined letter works with Alt, e.g. **Alt+D** for Download, **Alt+P** for Paste.
+- Every underlined letter works with Alt, e.g. **Alt+D** for Download, **Alt+P** for Paste (Windows only).
+- On a Mac, Control-click works as a right-click.
 - Drag the bottom-right corner to make the window bigger.
 - The download folder and the options are remembered for next time.
 - On Windows 11 the title bar turns navy and the window corners become square.
 
 ### Installation
 
+**Windows 10 / 11**
+
 1. Download `MP3_320kbps_Downloader.exe` from [Releases](../../releases).
 2. Run it. FFmpeg and everything else it needs are inside the exe.
 3. If Windows SmartScreen warns about an unknown app, click **More info → Run anyway**.
+
+**macOS (Apple Silicon: M1 or newer)**
+
+1. Download `MP3_320kbps_Downloader-macOS.zip` from [Releases](../../releases) and double-click it to unzip.
+2. Drag `MP3_320kbps_Downloader` into **Applications** and open it from there.
+3. The app isn't signed by Apple, so the first time macOS says it can't be opened. Click **Done**,
+   then open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to the app's name.
+   You only need to do this once.
+4. When it saves to Downloads for the first time, macOS asks for permission. Click **Allow**.
+
+Intel Macs are not supported.
 
 ### Updates
 
 You don't need to come back here for new versions.
 
-- Every day, GitHub Actions checks whether yt-dlp (the part that talks to YouTube) has a new version. If it does, a new exe is built, tested and published automatically, and the old release is removed.
-- The exe checks for a new release a few seconds after it starts. If there is one, it asks **"Update now?"**. Click **Yes** and it downloads the new exe, checks it, replaces itself and restarts.
+- Every day, GitHub Actions checks whether yt-dlp (the part that talks to YouTube) has a new version. If it does, new Windows and Mac versions are built, tested and published automatically, and the old release is removed.
+- The app checks for a new release a few seconds after it starts. If there is one, it asks **"Update now?"**. Click **Yes** and it downloads the new version, checks it, replaces itself and restarts.
 - Click **No** and it won't ask again until the next version. **Help → Check for Updates...** checks right away.
-- If the update can't replace the file (for example because the exe is in a folder you can't write to), it offers to open the download page instead.
+- If the update can't replace the app (for example because it is in a folder you can't write to), it offers to open the download page instead.
+- On a Mac, keep the app in **Applications**: run straight from the Downloads folder, macOS doesn't let it replace itself.
 
 ### Running from source
 
-Requirements: Python 3.10 or newer.
+Requirements: Python 3.10 or newer. On a Mac, use the Python from [python.org](https://www.python.org/downloads/)
+(it comes with Tkinter; with Homebrew you also need `brew install python-tk`).
 
 ```bash
 pip install -r requirements.txt
@@ -81,12 +98,13 @@ If you want to use your own FFmpeg instead, put `ffmpeg.exe` next to `main.py` o
 ### Building the .exe
 
 ```bash
-pip install -r requirements.txt pyinstaller
+pip install -r requirements.txt pyinstaller pillow
 python build.py --version 2.0.0
 ```
 
-The exe ends up in `dist/MP3_320kbps_Downloader.exe`, with FFmpeg and Deno packed inside.
-You normally don't need to do this: the release workflow builds and publishes the exe for you
+On Windows this makes `dist/MP3_320kbps_Downloader.exe`, on a Mac `dist/MP3_320kbps_Downloader-macOS.zip`
+(the zipped `.app`), with FFmpeg and Deno packed inside.
+You normally don't need to do this: the release workflow builds and publishes both for you
 (**Actions → Release → Run workflow** to do it by hand).
 
 | File | Contents |
@@ -95,9 +113,10 @@ You normally don't need to do this: the release workflow builds and publishes th
 | `app.py` | The window: link box, progress, download list, menus, settings |
 | `downloader.py` | The download queue: runs yt-dlp on a background thread, crops the cover, finds FFmpeg and Deno |
 | `win98.py` | Windows 98 widgets drawn by hand: buttons, check boxes, group boxes, progress bar, message boxes, pixel-art icons |
-| `updater.py` | Checks GitHub Releases for a newer exe, downloads it and swaps it in |
-| `build.py` | Builds the single-file exe with PyInstaller |
-| `.github/workflows/release.yml` | Builds, tests and publishes the exe on Windows; runs daily for new yt-dlp versions |
+| `updater.py` | Checks GitHub Releases for a newer version, downloads it and swaps it in (the .exe, or the .app on a Mac) |
+| `build.py` | Builds the app with PyInstaller: one .exe on Windows, a zipped .app on a Mac |
+| `.github/workflows/release.yml` | Builds, tests and publishes the Windows and Mac versions; runs daily for new yt-dlp versions |
+| `.github/scripts/test_update.py` | Release check: an installed copy of the app updates itself to the new build |
 | `icon.ico` | Program icon |
 
 ### Troubleshooting
@@ -120,7 +139,8 @@ Please only download videos you have the right to save.
 ## 한국어
 
 YouTube 링크를 붙여넣으면 앨범 커버와 태그가 들어간 **320 kbps MP3**로 저장해 주는 프로그램입니다.
-창은 Windows 98 프로그램처럼 생겼습니다. Python(Tkinter), yt-dlp, FFmpeg로 만들었습니다.
+창은 Windows 98 프로그램처럼 생겼습니다. Windows 10 / 11과 Apple Silicon 맥에서 돌아갑니다.
+Python(Tkinter), yt-dlp, FFmpeg로 만들었습니다.
 
 ### 동작 방식
 
@@ -159,29 +179,45 @@ YouTube 링크 → yt-dlp (가장 좋은 음질) → FFmpeg → 320 kbps MP3 + �
 - 링크 여러 개를 띄어쓰기나 줄바꿈으로 구분해서 한 번에 붙여넣을 수 있습니다.
 - 다운로드 중에도 링크를 계속 추가할 수 있습니다.
 - 목록에서 곡을 오른쪽 클릭하면 다시 시도, 링크 복사, 목록에서 지우기를 할 수 있습니다. 실패한 항목을 더블클릭하면 이유가 나옵니다.
-- 밑줄 친 글자는 Alt와 같이 누르면 됩니다. 예: **Alt+D** 다운로드, **Alt+P** 붙여넣기.
+- 밑줄 친 글자는 Alt와 같이 누르면 됩니다. 예: **Alt+D** 다운로드, **Alt+P** 붙여넣기 (Windows만).
+- 맥에서는 Control-클릭이 오른쪽 클릭 역할을 합니다.
 - 오른쪽 아래 모서리를 드래그하면 창을 키울 수 있습니다.
 - 저장 폴더와 옵션은 다음에 켤 때도 그대로 남아 있습니다.
 - Windows 11에서는 제목 표시줄이 남색으로 바뀌고 창 모서리가 각지게 됩니다.
 
 ### 설치
 
+**Windows 10 / 11**
+
 1. [Releases](../../releases)에서 `MP3_320kbps_Downloader.exe`를 받습니다.
 2. 실행합니다. FFmpeg 등 필요한 것은 exe 안에 다 들어 있습니다.
 3. Windows SmartScreen이 경고하면 **추가 정보 → 실행**을 누릅니다.
+
+**macOS (Apple Silicon: M1 이상)**
+
+1. [Releases](../../releases)에서 `MP3_320kbps_Downloader-macOS.zip`을 받아 더블클릭해서 압축을 풉니다.
+2. `MP3_320kbps_Downloader`를 **응용 프로그램** 폴더로 끌어다 놓고 거기서 실행합니다.
+3. Apple 서명이 없는 앱이라 처음에는 macOS가 열 수 없다고 합니다. **완료**를 누른 뒤
+   **시스템 설정 → 개인정보 보호 및 보안**을 열고 아래로 내려서 앱 이름 옆의 **그래도 열기**를 누르세요.
+   한 번만 하면 됩니다.
+4. 처음으로 다운로드 폴더에 저장할 때 macOS가 권한을 물어봅니다. **허용**을 누르세요.
+
+Intel 맥은 지원하지 않습니다.
 
 ### 업데이트
 
 새 버전을 받으러 여기 다시 올 필요가 없습니다.
 
-- GitHub Actions가 매일 yt-dlp(YouTube와 통신하는 부분)에 새 버전이 나왔는지 확인합니다. 나왔으면 새 exe를 자동으로 빌드하고 테스트해서 올리고, 예전 릴리스는 지웁니다.
-- exe는 켜지고 몇 초 뒤에 새 릴리스가 있는지 확인합니다. 있으면 **"Update now?"** 라고 묻고, **Yes**를 누르면 새 exe를 받아 검사한 뒤 자기 자신을 바꾸고 다시 시작합니다.
+- GitHub Actions가 매일 yt-dlp(YouTube와 통신하는 부분)에 새 버전이 나왔는지 확인합니다. 나왔으면 Windows용과 맥용을 자동으로 빌드하고 테스트해서 올리고, 예전 릴리스는 지웁니다.
+- 앱은 켜지고 몇 초 뒤에 새 릴리스가 있는지 확인합니다. 있으면 **"Update now?"** 라고 묻고, **Yes**를 누르면 새 버전을 받아 검사한 뒤 자기 자신을 바꾸고 다시 시작합니다.
 - **No**를 누르면 다음 버전이 나올 때까지 다시 묻지 않습니다. **Help → Check for Updates...** 로 바로 확인할 수도 있습니다.
-- 파일을 바꿀 수 없으면 (예: 쓰기 권한이 없는 폴더에 exe가 있을 때) 대신 다운로드 페이지를 열어 줍니다.
+- 앱을 바꿀 수 없으면 (예: 쓰기 권한이 없는 폴더에 있을 때) 대신 다운로드 페이지를 열어 줍니다.
+- 맥에서는 앱을 **응용 프로그램** 폴더에 두세요. 다운로드 폴더에서 바로 실행하면 macOS가 앱이 자기 자신을 바꾸지 못하게 합니다.
 
 ### 소스로 실행하기
 
-필요한 것: Python 3.10 이상.
+필요한 것: Python 3.10 이상. 맥에서는 [python.org](https://www.python.org/downloads/)의 Python을 쓰세요
+(Tkinter가 들어 있습니다. Homebrew Python이면 `brew install python-tk`도 필요합니다).
 
 ```bash
 pip install -r requirements.txt
@@ -194,12 +230,13 @@ python main.py
 ### exe 만들기
 
 ```bash
-pip install -r requirements.txt pyinstaller
+pip install -r requirements.txt pyinstaller pillow
 python build.py --version 2.0.0
 ```
 
-`dist/MP3_320kbps_Downloader.exe`에 FFmpeg와 Deno가 들어간 exe가 만들어집니다.
-보통은 직접 할 필요가 없습니다. 릴리스 워크플로가 exe를 빌드해서 올려 줍니다
+Windows에서는 `dist/MP3_320kbps_Downloader.exe`, 맥에서는 `dist/MP3_320kbps_Downloader-macOS.zip`(`.app`을 압축한 것)이
+만들어지고, 안에 FFmpeg와 Deno가 들어 있습니다.
+보통은 직접 할 필요가 없습니다. 릴리스 워크플로가 둘 다 빌드해서 올려 줍니다
 (직접 돌리려면 **Actions → Release → Run workflow**).
 
 | 파일 | 내용 |
@@ -208,9 +245,10 @@ python build.py --version 2.0.0
 | `app.py` | 창: 링크 입력, 진행 상황, 다운로드 목록, 메뉴, 설정 저장 |
 | `downloader.py` | 다운로드 대기열: 백그라운드 스레드에서 yt-dlp 실행, 커버 자르기, FFmpeg와 Deno 찾기 |
 | `win98.py` | 직접 그린 Windows 98 위젯: 버튼, 체크박스, 그룹 상자, 진행 막대, 메시지 창, 픽셀 아트 아이콘 |
-| `updater.py` | GitHub Releases에서 새 exe를 확인하고, 받아서 교체 |
-| `build.py` | PyInstaller로 exe 파일 하나 만들기 |
-| `.github/workflows/release.yml` | Windows에서 exe를 빌드·테스트·게시. yt-dlp 새 버전을 확인하려고 매일 실행 |
+| `updater.py` | GitHub Releases에서 새 버전을 확인하고, 받아서 교체 (.exe, 맥은 .app) |
+| `build.py` | PyInstaller로 빌드: Windows는 exe 하나, 맥은 .app을 압축한 zip |
+| `.github/workflows/release.yml` | Windows용과 맥용을 빌드·테스트·게시. yt-dlp 새 버전을 확인하려고 매일 실행 |
+| `.github/scripts/test_update.py` | 릴리스 전 검사: 설치된 앱이 새 빌드로 스스로 업데이트되는지 확인 |
 | `icon.ico` | 프로그램 아이콘 |
 
 ### 문제 해결

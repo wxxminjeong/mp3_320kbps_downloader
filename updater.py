@@ -1,7 +1,8 @@
-"""Self-update for the packaged exe, using this repository's GitHub Releases.
+"""Self-update for the packaged app, using this repository's GitHub Releases.
 
-The release workflow (.github/workflows/release.yml) rebuilds the exe whenever
+The release workflow (.github/workflows/release.yml) rebuilds the app whenever
 yt-dlp gets a new version, so updating the app also updates yt-dlp.
+On Windows the update replaces the .exe; on a Mac it replaces the whole .app.
 Nothing here runs when the app is started from source.
 """
 
@@ -9,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -17,7 +19,8 @@ from dataclasses import dataclass
 REPO = "wxxminjeong/mp3_320kbps_downloader"
 LATEST_RELEASE_API = f"https://api.github.com/repos/{REPO}/releases/latest"
 RELEASES_PAGE = f"https://github.com/{REPO}/releases/latest"
-ASSET_NAME = "MP3_320kbps_Downloader.exe"
+MAC = sys.platform == "darwin"
+ASSET_NAME = "MP3_320kbps_Downloader-macOS.zip" if MAC else "MP3_320kbps_Downloader.exe"
 
 
 @dataclass
@@ -29,7 +32,7 @@ class Update:
 
 
 def current_version():
-    """Version written into the exe by build.py, or None when running from source."""
+    """Version written into the app by build.py, or None when running from source."""
     if not getattr(sys, "frozen", False):
         return None
     try:
@@ -37,6 +40,13 @@ def current_version():
             return f.read().strip() or None
     except OSError:
         return None
+
+
+def installed_path():
+    """What an update replaces: the running .exe, or on a Mac the .app around it."""
+    if MAC:  # .../MP3_320kbps_Downloader.app/Contents/MacOS/MP3_320kbps_Downloader
+        return os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", ".."))
+    return sys.executable
 
 
 def _version_tuple(version):
@@ -48,7 +58,7 @@ def _request(url, accept="application/vnd.github+json"):
 
 
 def check(timeout=15):
-    """The newest release if it is newer than this exe, else None.
+    """The newest release if it is newer than this app, else None.
 
     Raises OSError (network) or ValueError (unexpected reply).
     """
@@ -69,17 +79,18 @@ def check(timeout=15):
 
 
 def download(update, progress=None, timeout=30):
-    """Download the new exe next to the running one and return its path.
+    """Download the update next to the installed app; returns the new .exe / .app.
 
     `progress(done, total)` is called as bytes arrive. The file is checked
     against the size and SHA-256 that GitHub reports for it.
     """
-    target = sys.executable + ".new"
+    target = installed_path()
+    archive = target + ".download"
     sha256 = hashlib.sha256()
     done = 0
     try:
         with urllib.request.urlopen(_request(update.url, "application/octet-stream"), timeout=timeout) as response, \
-                open(target, "wb") as f:
+                open(archive, "wb") as f:
             total = update.size or int(response.headers.get("Content-Length") or 0)
             while True:
                 chunk = response.read(256 * 1024)
@@ -94,42 +105,64 @@ def download(update, progress=None, timeout=30):
             raise ValueError("The download was incomplete.")
         if update.sha256 and sha256.hexdigest() != update.sha256.lower():
             raise ValueError("The downloaded file is damaged (checksum mismatch).")
+        if not MAC:
+            shutil.copymode(target, archive)  # keep it executable where that matters
+            return archive
+
+        staging = target + ".new"
+        _remove(staging)
+        # ditto, unlike zipfile, keeps the symlinks and permissions inside the .app.
+        subprocess.run(["ditto", "-x", "-k", archive, staging], check=True, capture_output=True)
+        apps = [name for name in os.listdir(staging) if name.endswith(".app")]
+        if len(apps) != 1:
+            raise ValueError("The update doesn't contain the app.")
+        return os.path.join(staging, apps[0])
     except BaseException:
-        _remove(target)
+        _remove(archive)
         raise
-    return target
+    finally:
+        if MAC:
+            _remove(archive)
 
 
-def install_and_restart(new_exe):
-    """Put the new exe in place of the running one and start it.
+def install_and_restart(new_path, args=()):
+    """Put the downloaded app in place of the running one and start it.
 
-    Windows won't let a running exe be overwritten, but it can be renamed, so
-    the old one is moved aside to "<name>.old" (deleted on the next start).
-    The caller should quit right after this returns.
+    A running exe can't be overwritten but it can be renamed, so the old one
+    is moved aside to "<name>.old" (deleted on the next start). Same for the
+    .app on a Mac. The caller should quit right after this returns.
     """
-    exe = sys.executable
-    old = exe + ".old"
+    target = installed_path()
+    old = target + ".old"
     _remove(old)
-    os.replace(exe, old)
+    os.replace(target, old)
     try:
-        os.replace(new_exe, exe)
+        os.replace(new_path, target)
     except OSError:
-        os.replace(old, exe)
+        os.replace(old, target)
         raise
-    # Without this the new exe would think it belongs to this (exiting) process.
+    if MAC:
+        _remove(os.path.dirname(new_path))  # the now empty staging folder
+        command = ["open", "-n", target] + (["--args", *args] if args else [])
+    else:
+        command = [target, *args]
+    # Without this a new PyInstaller exe would think it belongs to this (exiting) process.
     env = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT="1")
-    subprocess.Popen([exe], env=env, cwd=os.path.dirname(exe), close_fds=True,
+    subprocess.Popen(command, env=env, cwd=os.path.dirname(target), close_fds=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def cleanup():
-    """Delete the exe that an earlier update moved aside."""
+    """Delete the app that an earlier update moved aside."""
     if getattr(sys, "frozen", False):
-        _remove(sys.executable + ".old")
+        _remove(installed_path() + ".old")
 
 
 def _remove(path):
     try:
-        os.remove(path)
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
     except OSError:
         pass
