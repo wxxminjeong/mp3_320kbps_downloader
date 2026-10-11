@@ -57,6 +57,15 @@ Tips:
 2. Run it. FFmpeg and everything else it needs are inside the exe.
 3. If Windows SmartScreen warns about an unknown app, click **More info → Run anyway**.
 
+### Updates
+
+You don't need to come back here for new versions.
+
+- Every day, GitHub Actions checks whether yt-dlp (the part that talks to YouTube) has a new version. If it does, a new exe is built, tested and published automatically, and the old release is removed.
+- The exe checks for a new release a few seconds after it starts. If there is one, it asks **"Update now?"**. Click **Yes** and it downloads the new exe, checks it, replaces itself and restarts.
+- Click **No** and it won't ask again until the next version. **Help → Check for Updates...** checks right away.
+- If the update can't replace the file (for example because the exe is in a folder you can't write to), it offers to open the download page instead.
+
 ### Running from source
 
 Requirements: Python 3.10 or newer.
@@ -73,10 +82,12 @@ If you want to use your own FFmpeg instead, put `ffmpeg.exe` next to `main.py` o
 
 ```bash
 pip install -r requirements.txt pyinstaller
-python build.py
+python build.py --version 2.0.0
 ```
 
 The exe ends up in `dist/MP3_320kbps_Downloader.exe`, with FFmpeg and Deno packed inside.
+You normally don't need to do this: the release workflow builds and publishes the exe for you
+(**Actions → Release → Run workflow** to do it by hand).
 
 | File | Contents |
 | :--- | :--- |
@@ -84,7 +95,9 @@ The exe ends up in `dist/MP3_320kbps_Downloader.exe`, with FFmpeg and Deno packe
 | `app.py` | The window: link box, progress, download list, menus, settings |
 | `downloader.py` | The download queue: runs yt-dlp on a background thread, crops the cover, finds FFmpeg and Deno |
 | `win98.py` | Windows 98 widgets drawn by hand: buttons, check boxes, group boxes, progress bar, message boxes, pixel-art icons |
+| `updater.py` | Checks GitHub Releases for a newer exe, downloads it and swaps it in |
 | `build.py` | Builds the single-file exe with PyInstaller |
+| `.github/workflows/release.yml` | Builds, tests and publishes the exe on Windows; runs daily for new yt-dlp versions |
 | `icon.ico` | Program icon |
 
 ### Troubleshooting
@@ -93,7 +106,7 @@ The exe ends up in `dist/MP3_320kbps_Downloader.exe`, with FFmpeg and Deno packe
 | :--- | :--- |
 | `ffmpeg-location ffmpeg.exe does not exist` / `ffprobe and ffmpeg not found` | Version 1 only looked for `ffmpeg.exe` in the folder you started it from. Version 2 finds it by itself: run `pip install -r requirements.txt` again. |
 | `No supported JavaScript runtime could be found` | YouTube now needs a JavaScript runtime. `pip install -r requirements.txt` installs Deno for you. |
-| HTTP 403, or "confirm you're not a bot" | YouTube changed something. Update yt-dlp with `pip install -U "yt-dlp[default,deno]"` (or get the newest exe). |
+| HTTP 403, or "confirm you're not a bot" | YouTube changed something. Use **Help → Check for Updates...**, or from source run `pip install -U "yt-dlp[default,deno]"`. |
 
 ### Credits
 
@@ -157,6 +170,15 @@ YouTube 링크 → yt-dlp (가장 좋은 음질) → FFmpeg → 320 kbps MP3 + �
 2. 실행합니다. FFmpeg 등 필요한 것은 exe 안에 다 들어 있습니다.
 3. Windows SmartScreen이 경고하면 **추가 정보 → 실행**을 누릅니다.
 
+### 업데이트
+
+새 버전을 받으러 여기 다시 올 필요가 없습니다.
+
+- GitHub Actions가 매일 yt-dlp(YouTube와 통신하는 부분)에 새 버전이 나왔는지 확인합니다. 나왔으면 새 exe를 자동으로 빌드하고 테스트해서 올리고, 예전 릴리스는 지웁니다.
+- exe는 켜지고 몇 초 뒤에 새 릴리스가 있는지 확인합니다. 있으면 **"Update now?"** 라고 묻고, **Yes**를 누르면 새 exe를 받아 검사한 뒤 자기 자신을 바꾸고 다시 시작합니다.
+- **No**를 누르면 다음 버전이 나올 때까지 다시 묻지 않습니다. **Help → Check for Updates...** 로 바로 확인할 수도 있습니다.
+- 파일을 바꿀 수 없으면 (예: 쓰기 권한이 없는 폴더에 exe가 있을 때) 대신 다운로드 페이지를 열어 줍니다.
+
 ### 소스로 실행하기
 
 필요한 것: Python 3.10 이상.
@@ -173,10 +195,12 @@ python main.py
 
 ```bash
 pip install -r requirements.txt pyinstaller
-python build.py
+python build.py --version 2.0.0
 ```
 
 `dist/MP3_320kbps_Downloader.exe`에 FFmpeg와 Deno가 들어간 exe가 만들어집니다.
+보통은 직접 할 필요가 없습니다. 릴리스 워크플로가 exe를 빌드해서 올려 줍니다
+(직접 돌리려면 **Actions → Release → Run workflow**).
 
 | 파일 | 내용 |
 | :--- | :--- |
@@ -184,7 +208,9 @@ python build.py
 | `app.py` | 창: 링크 입력, 진행 상황, 다운로드 목록, 메뉴, 설정 저장 |
 | `downloader.py` | 다운로드 대기열: 백그라운드 스레드에서 yt-dlp 실행, 커버 자르기, FFmpeg와 Deno 찾기 |
 | `win98.py` | 직접 그린 Windows 98 위젯: 버튼, 체크박스, 그룹 상자, 진행 막대, 메시지 창, 픽셀 아트 아이콘 |
+| `updater.py` | GitHub Releases에서 새 exe를 확인하고, 받아서 교체 |
 | `build.py` | PyInstaller로 exe 파일 하나 만들기 |
+| `.github/workflows/release.yml` | Windows에서 exe를 빌드·테스트·게시. yt-dlp 새 버전을 확인하려고 매일 실행 |
 | `icon.ico` | 프로그램 아이콘 |
 
 ### 문제 해결
@@ -193,7 +219,7 @@ python build.py
 | :--- | :--- |
 | `ffmpeg-location ffmpeg.exe does not exist` / `ffprobe and ffmpeg not found` | 1.0 버전은 프로그램을 실행한 폴더에서만 `ffmpeg.exe`를 찾았습니다. 2.0은 알아서 찾으니 `pip install -r requirements.txt`를 다시 실행하세요. |
 | `No supported JavaScript runtime could be found` | 이제 YouTube는 자바스크립트 런타임이 필요합니다. `pip install -r requirements.txt`가 Deno를 설치해 줍니다. |
-| HTTP 403, "confirm you're not a bot" | YouTube가 뭔가 바꾼 것입니다. `pip install -U "yt-dlp[default,deno]"`로 yt-dlp를 업데이트하세요 (exe는 최신 버전을 받으세요). |
+| HTTP 403, "confirm you're not a bot" | YouTube가 뭔가 바꾼 것입니다. **Help → Check for Updates...** 를 누르거나, 소스로 실행 중이면 `pip install -U "yt-dlp[default,deno]"`를 실행하세요. |
 
 ### 크레딧
 
