@@ -4,15 +4,15 @@
 # Runs when the app's code changes on main, by hand (Actions -> Release -> Run workflow),
 # and once a day to pick up new yt-dlp versions: YouTube changes often and old yt-dlp
 # versions stop working, so a fresh build is released whenever yt-dlp has a new version.
-# Each build must pass its self-test and a real self-update test before anything is
-# published. Older releases are deleted afterwards, so Releases always holds just the
-# newest build; the app checks Releases on start and offers to update itself (updater.py).
+# Each build must pass its self-test before anything is published. Older releases are
+# deleted afterwards, so Releases always holds just the newest build; the app checks
+# Releases on start and offers to open the download page (updater.py).
 name: Release
 
 on:
   push:
     branches: [main]
-    paths: ["*.py", "requirements.txt", "icon.ico", ".github/workflows/release.yml", ".github/scripts/**"]
+    paths: ["*.py", "requirements.txt", "icon.ico", ".github/workflows/release.yml"]
   schedule:
     - cron: "37 21 * * *"  # every day at 06:37 Korean time
   workflow_dispatch:
@@ -121,10 +121,6 @@ jobs:
           cat self-test.txt
           exit $status
 
-      - name: Self-update test
-        timeout-minutes: 5
-        run: python .github/scripts/test_update.py "dist/${{ matrix.asset }}"
-
       - uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.asset }}
@@ -156,11 +152,11 @@ jobs:
           | Windows 10 / 11 | \`MP3_320kbps_Downloader.exe\` |
           | macOS (Apple Silicon: M1 or newer) | \`MP3_320kbps_Downloader-macOS.zip\` |
 
-          FFmpeg and Deno are already inside. Already on version 2.0 or newer? The app offers this update by itself.
+          FFmpeg and Deno are already inside. The app tells you when a newer version is out.
           **Mac:** unzip, move the app to Applications and open it. The first time, macOS blocks it because it isn't signed:
           open **System Settings → Privacy & Security** and click **Open Anyway**.
 
-          FFmpeg와 Deno가 들어 있습니다. 2.0 이상을 쓰고 있다면 프로그램이 알아서 업데이트를 알려 줍니다.
+          FFmpeg와 Deno가 들어 있습니다. 새 버전이 나오면 프로그램이 알려 줍니다.
           **맥:** 압축을 풀고 앱을 응용 프로그램 폴더로 옮긴 뒤 실행하세요. 서명되지 않은 앱이라 처음에는 macOS가 막습니다.
           **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누르세요.
 

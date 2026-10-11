@@ -141,8 +141,7 @@ class App:
         self.current = None  # id of the job that is running
         self.saved_count = 0
         self.last_error = None
-        self.pending_update = None  # found while downloading; offered once idle
-        self.updating = False
+        self.offering = False  # the "new version" question is showing
         self.closed = False
 
         self.icons = {
@@ -174,7 +173,6 @@ class App:
             root.after(300, self._warn_no_ffmpeg)
         if updater.current_version():
             root.after(3000, self.check_for_updates, False)
-            root.after(5000, updater.cleanup)
         self.url_entry.focus_set()
 
     # -- layout -------------------------------------------------------------------------
@@ -315,9 +313,6 @@ class App:
     # -- actions ------------------------------------------------------------------------
 
     def download(self):
-        if self.updating:
-            win98.show_message(self.root, APP_NAME, "An update is being installed. Please wait a moment.")
-            return
         text = self.url_var.get().strip()
         links = parse_links(text)
         if not links:
@@ -518,7 +513,7 @@ class App:
 
     def _handle(self, event):
         kind, job_id = event["kind"], event.get("job")
-        if kind.startswith("update"):
+        if kind == "update_check":
             self._handle_update(event)
             return
         row = self.rows.get(job_id)
@@ -595,12 +590,8 @@ class App:
                 self.status.set(message)
                 self.root.after_idle(lambda: win98.show_message(
                     self.root, APP_NAME, f"Could not download:\n{name}\n\n{message}", "error"))
-            else:
-                if saved:
-                    self.root.bell()
-                if self.pending_update:  # one dialog at a time: not after an error message
-                    self.root.after_idle(self._offer_update, self.pending_update)
-                    self.pending_update = None
+            elif saved:
+                self.root.bell()
 
         self._update_queue_pane()
 
@@ -617,7 +608,7 @@ class App:
 
         def work():
             try:
-                event = {"kind": "update_check", "update": updater.check(), "asked": asked}
+                event = {"kind": "update_check", "version": updater.check(), "asked": asked}
             except Exception as e:
                 event = {"kind": "update_check", "error": str(e), "asked": asked}
             self.events.put(event)
@@ -625,80 +616,36 @@ class App:
         threading.Thread(target=work, name="update-check", daemon=True).start()
 
     def _handle_update(self, event):
-        kind = event["kind"]
-        if kind == "update_check":
-            update, asked = event.get("update"), event["asked"]
-            if event.get("error"):
-                if asked:
-                    self.root.after_idle(lambda: win98.show_message(
-                        self.root, "Check for Updates", f"Couldn't check for updates.\n\n{event['error']}", "warning"))
-            elif not update:
-                if asked:
-                    self.root.after_idle(lambda: win98.show_message(
-                        self.root, "Check for Updates", f"You have the newest version ({updater.current_version()})."))
-            elif asked or update.version != self.settings["skipped_version"]:
-                if self.manager.busy:
-                    self.pending_update = update
-                else:
-                    self.root.after_idle(self._offer_update, update)
+        version, asked = event.get("version"), event["asked"]
+        if event.get("error"):
+            if asked:
+                self.root.after_idle(lambda: win98.show_message(
+                    self.root, "Check for Updates", f"Couldn't check for updates.\n\n{event['error']}", "warning"))
+        elif not version:
+            if asked:
+                self.root.after_idle(lambda: win98.show_message(
+                    self.root, "Check for Updates", f"You have the newest version ({updater.current_version()})."))
+        elif asked or version != self.settings["skipped_version"]:
+            self.root.after_idle(self._offer_update, version)
 
-        elif kind == "update_progress":
-            done, total = event["done"], event["total"]
-            self.bar.set(done / total if total else 0)
-            self.time_left.set(f"({format_size(done)} of {format_size(total)} copied)")
-
-        elif kind == "update_ready":
-            try:
-                updater.install_and_restart(event["path"])
-            except OSError as e:
-                self._update_failed(f"Couldn't replace the program file.\n{e}")
-                return
-            self._save_settings()
-            self.closed = True
-            self.animation.stop()
-            self.root.destroy()
-
-        elif kind == "update_failed":
-            self._update_failed(event["message"])
-
-    def _offer_update(self, update):
-        if self.updating or self.manager.busy:
+    def _offer_update(self, version):
+        if self.offering:  # the startup check and Help > Check for Updates at the same time
             return
-        if not win98.ask_yes_no(self.root, "Update Available", (
-                f"A new version of {APP_NAME} is available.\n\n"
-                f"Your version:   {updater.current_version()}\n"
-                f"New version:    {update.version}\n\n"
-                "New versions come with the newest yt-dlp, which keeps YouTube downloads working.\n\n"
-                "Update now? The program will restart by itself."), "info"):
-            self.settings["skipped_version"] = update.version  # don't ask again for this one
-            self._save_settings()
-            return
-
-        self.updating = True
-        self.animation.start()
-        self.bar.set(0)
-        self.caption.set(f"Downloading version {update.version}...")
-        self.rate.set("")
-        self.status.set("Downloading update...")
-
-        def progress(done, total):
-            self.events.put({"kind": "update_progress", "done": done, "total": total})
-
-        def work():
-            try:
-                self.events.put({"kind": "update_ready", "path": updater.download(update, progress)})
-            except Exception as e:
-                self.events.put({"kind": "update_failed", "message": str(e)})
-
-        threading.Thread(target=work, name="update-download", daemon=True).start()
-
-    def _update_failed(self, message):
-        self.updating = False
-        self._set_idle()
-        self.root.after_idle(lambda: win98.ask_yes_no(
-            self.root, "Update Failed",
-            f"The update didn't work:\n{message}\n\nOpen the download page to get the new version yourself?",
-            "error") and webbrowser.open(updater.RELEASES_PAGE))
+        self.offering = True
+        try:
+            if win98.ask_yes_no(self.root, "Update Available", (
+                    f"A new version of {APP_NAME} is available.\n\n"
+                    f"Your version:   {updater.current_version()}\n"
+                    f"New version:    {version}\n\n"
+                    "New versions come with the newest yt-dlp, which keeps YouTube downloads working.\n\n"
+                    "Open the download page? Download the new version there and use it "
+                    "instead of this one."), "info"):
+                webbrowser.open(updater.RELEASES_PAGE)
+            else:
+                self.settings["skipped_version"] = version  # don't ask again for this one
+                self._save_settings()
+        finally:
+            self.offering = False
 
     def _set_idle(self):
         self.current = None

@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 import threading
+import time
 from dataclasses import dataclass
 
 import yt_dlp
@@ -293,12 +294,15 @@ class DownloadManager:
             if self._cancel.is_set():
                 raise DownloadCancelled("Cancelled by user")
 
+        last_progress = [0.0]
+
         def on_progress(d):
             check_cancel()
             info = d.get("info_dict") or {}
             leftovers.update(p for p in (d.get("tmpfilename"), d.get("filename")) if p)
             leftovers.update(t["filepath"] for t in info.get("thumbnails") or () if t.get("filepath"))
-            if d["status"] == "downloading":
+            if d["status"] == "downloading" and time.monotonic() - last_progress[0] >= 0.15:
+                last_progress[0] = time.monotonic()
                 emit(
                     "progress",
                     title=info.get("title") or "",
