@@ -1,3 +1,2 @@
-customtkinter
-yt-dlp
-mutagen
+yt-dlp[default,deno]
+imageio-ffmpeg
