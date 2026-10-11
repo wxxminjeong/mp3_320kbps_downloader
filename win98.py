@@ -369,7 +369,14 @@ def split_mnemonic(text):
 
 
 def bind_mnemonic(widget, letter, action):
-    """Alt+letter anywhere in the widget's window runs `action`."""
+    """Alt+letter anywhere in the widget's window runs `action`.
+
+    Not on a Mac: Option+letter types special characters there and
+    Command+letter is taken by copy/paste and friends.
+    """
+    if sys.platform == "darwin":
+        return
+
     def handler(event):
         if widget.winfo_viewable():
             action()
@@ -378,6 +385,14 @@ def bind_mnemonic(widget, letter, action):
     top = widget.winfo_toplevel()
     for key in {letter.lower(), letter.upper()}:
         top.bind(f"<Alt-KeyPress-{key}>", handler)
+
+
+def bind_context_menu(widget, handler):
+    """Right-click opens a context menu (on a Mac also Control-click)."""
+    widget.bind("<Button-3>", handler)
+    if sys.platform == "darwin":
+        widget.bind("<Button-2>", handler)  # Tk 8.6 on macOS numbers the right button 2
+        widget.bind("<Control-Button-1>", handler)
 
 
 # -- ttk (list view and scroll bar) ---------------------------------------------------
@@ -719,7 +734,7 @@ class Entry(Bevel):
             insertbackground=TEXT, insertwidth=theme.unit,
             selectbackground=SELECT, selectforeground=SELECT_TEXT, selectborderwidth=0)
         self.entry.pack(fill="both", expand=True, padx=px(2), pady=px(2))
-        self.entry.bind("<Button-3>", self._context_menu)
+        bind_context_menu(self.entry, self._context_menu)
         self.entry.bind("<Control-a>", self._select_all)
         self.entry.bind("<Control-A>", self._select_all)
 

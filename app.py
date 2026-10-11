@@ -165,6 +165,9 @@ class App:
         root.update_idletasks()
         root.minsize(root.winfo_reqwidth(), root.winfo_reqheight())
         root.protocol("WM_DELETE_WINDOW", self.quit)
+        if sys.platform == "darwin":  # Command+Q and the app menu's About item
+            root.createcommand("::tk::mac::Quit", self.quit)
+            root.createcommand("tkAboutDialog", self.show_about)
         root.after(10, win98.style_window, root)
         root.after(60, self._poll)
         if not self.manager.ffmpeg:
@@ -299,7 +302,7 @@ class App:
         tree.bind("<Double-1>", self._on_row_double_click)
         tree.bind("<Return>", self._on_row_double_click)
         tree.bind("<Delete>", lambda e: self.remove_selected())
-        tree.bind("<Button-3>", self._on_row_menu)
+        win98.bind_context_menu(tree, self._on_row_menu)
 
     def _build_buttons(self, parent):
         row = tk.Frame(parent, bg=FACE)

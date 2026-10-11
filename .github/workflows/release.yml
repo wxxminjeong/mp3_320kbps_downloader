@@ -1,16 +1,18 @@
-# Builds MP3_320kbps_Downloader.exe on Windows and publishes it as a GitHub Release.
+# Builds the app for Windows (.exe) and macOS on Apple Silicon (zipped .app) and
+# publishes both as one GitHub Release.
 #
 # Runs when the app's code changes on main, by hand (Actions -> Release -> Run workflow),
 # and once a day to pick up new yt-dlp versions: YouTube changes often and old yt-dlp
-# versions stop working, so a fresh exe is released whenever yt-dlp has a new version.
-# Older releases are deleted afterwards, so Releases always holds just the newest exe.
-# The app checks Releases on start and offers to update itself (updater.py).
+# versions stop working, so a fresh build is released whenever yt-dlp has a new version.
+# Each build must pass its self-test and a real self-update test before anything is
+# published. Older releases are deleted afterwards, so Releases always holds just the
+# newest build; the app checks Releases on start and offers to update itself (updater.py).
 name: Release
 
 on:
   push:
     branches: [main]
-    paths: ["*.py", "requirements.txt", "icon.ico", ".github/workflows/release.yml"]
+    paths: ["*.py", "requirements.txt", "icon.ico", ".github/workflows/release.yml", ".github/scripts/**"]
   schedule:
     - cron: "37 21 * * *"  # every day at 06:37 Korean time
   workflow_dispatch:
@@ -23,11 +25,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: windows-latest
-    timeout-minutes: 30
+  plan:
+    runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      ytdlp: ${{ steps.plan.outputs.ytdlp }}
+      build: ${{ steps.plan.outputs.build }}
     steps:
       - uses: actions/checkout@v5
 
@@ -35,8 +41,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: python -m pip install --upgrade -r requirements.txt pyinstaller
+      - name: Get the newest yt-dlp
+        run: python -m pip install --upgrade yt-dlp
 
       - name: Decide whether there is anything new
         id: plan
@@ -71,12 +77,33 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write(f"release={str(release).lower()}\nversion={version}\nytdlp={ytdlp}\nbuild={build}\n")
 
-      - name: Build the exe
-        if: steps.plan.outputs.release == 'true'
-        run: python build.py --version "${{ steps.plan.outputs.version }}"
+  build:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            asset: MP3_320kbps_Downloader.exe
+          - os: macos-latest  # Apple Silicon
+            asset: MP3_320kbps_Downloader-macOS.zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
 
-      - name: Test the exe
-        if: steps.plan.outputs.release == 'true'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade -r requirements.txt pyinstaller pillow
+
+      - name: Build
+        run: python build.py --version "${{ needs.plan.outputs.version }}"
+
+      - name: Self-test (Windows)
+        if: runner.os == 'Windows'
         timeout-minutes: 5
         shell: pwsh
         run: |
@@ -85,29 +112,66 @@ jobs:
           Get-Content self-test.txt
           if ($run.ExitCode -ne 0) { throw "Self-test failed (exit code $($run.ExitCode))" }
 
-      - name: Publish the release and delete the older ones
-        if: steps.plan.outputs.release == 'true'
-        shell: bash
-        env:
-          VERSION: ${{ steps.plan.outputs.version }}
-          YTDLP: ${{ steps.plan.outputs.ytdlp }}
-          BUILD: ${{ steps.plan.outputs.build }}
+      - name: Self-test (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
         run: |
-          cat > notes.md <<EOF
-          **Download \`MP3_320kbps_Downloader.exe\` below and run it.** FFmpeg and Deno are already inside.
-          Using version 2.0 or newer? The app offers this update by itself.
+          status=0
+          dist/MP3_320kbps_Downloader.app/Contents/MacOS/MP3_320kbps_Downloader --self-test "$PWD/self-test.txt" || status=$?
+          cat self-test.txt
+          exit $status
 
-          **아래 \`MP3_320kbps_Downloader.exe\`를 받아서 실행하세요.** FFmpeg와 Deno가 들어 있습니다.
-          2.0 이상을 쓰고 있다면 프로그램이 알아서 업데이트를 알려 줍니다.
+      - name: Self-update test
+        timeout-minutes: 5
+        run: python .github/scripts/test_update.py "dist/${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      YTDLP: ${{ needs.plan.outputs.ytdlp }}
+      BUILD: ${{ needs.plan.outputs.build }}
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Publish the release and delete the older ones
+        run: |
+          ls -l assets
+          cat > notes.md <<EOF
+          | | Download |
+          | :--- | :--- |
+          | Windows 10 / 11 | \`MP3_320kbps_Downloader.exe\` |
+          | macOS (Apple Silicon: M1 or newer) | \`MP3_320kbps_Downloader-macOS.zip\` |
+
+          FFmpeg and Deno are already inside. Already on version 2.0 or newer? The app offers this update by itself.
+          **Mac:** unzip, move the app to Applications and open it. The first time, macOS blocks it because it isn't signed:
+          open **System Settings → Privacy & Security** and click **Open Anyway**.
+
+          FFmpeg와 Deno가 들어 있습니다. 2.0 이상을 쓰고 있다면 프로그램이 알아서 업데이트를 알려 줍니다.
+          **맥:** 압축을 풀고 앱을 응용 프로그램 폴더로 옮긴 뒤 실행하세요. 서명되지 않은 앱이라 처음에는 macOS가 막습니다.
+          **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누르세요.
 
           - yt-dlp $YTDLP
 
           Build: $BUILD
           EOF
-          gh release create "v$VERSION" dist/MP3_320kbps_Downloader.exe --target "$GITHUB_SHA" \
+          gh release create "v$VERSION" assets/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "MP3 320kbps Downloader $VERSION" --notes-file notes.md --latest
-          gh release list --limit 100 --json tagName --jq '.[].tagName' | while read -r tag; do
-            if [ "$tag" != "v$VERSION" ]; then
-              gh release delete "$tag" --cleanup-tag --yes
-            fi
-          done
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' |
+            while read -r tag; do
+              if [ "$tag" != "v$VERSION" ]; then
+                gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+              fi
+            done
